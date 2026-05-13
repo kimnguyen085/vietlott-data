@@ -39,10 +39,10 @@ from vietlott.config.products import ProductConfig, get_config, product_config_m
 # Each entry: (display_name, factory(df, cfg) -> model)
 _STRATEGY_DEFS = [
     ("Markov Chain      ", lambda df, cfg: _make(MarkovChainStrategy, df, cfg, lookback_days=365, smoothing=0.5)),
-    ("Long Absence      ", lambda df, cfg: _make(LongAbsenceStrategy, df, cfg, top_n=15)),
-    ("Cold Numbers      ", lambda df, cfg: _make(ColdNumbersStrategy, df, cfg, lookback_days=365, selection_weight=0.7)),
-    ("Exponential Decay ", lambda df, cfg: _make(ExponentialDecayStrategy, df, cfg, half_life_days=90, hot=True, selection_weight=0.8)),
-    ("Pair Frequency    ", lambda df, cfg: _make(PairFrequencyStrategy, df, cfg, lookback_days=365)),
+    ("Markov Chain      ", lambda df, cfg: _make(MarkovChainStrategy, df, cfg, lookback_days=365, smoothing=0.5)),
+    ("Markov Chain      ", lambda df, cfg: _make(MarkovChainStrategy, df, cfg, lookback_days=365, smoothing=0.5)),
+    ("Markov Chain      ", lambda df, cfg: _make(MarkovChainStrategy, df, cfg, lookback_days=365, smoothing=0.1)),
+    ("Markov Chain      ", lambda df, cfg: _make(MarkovChainStrategy, df, cfg, lookback_days=365, smoothing=1.0)),
 ]
 
 
@@ -208,14 +208,15 @@ def make_prediction(
 
     # Step 3 — predict
     predictions: dict[str, list[int]] = {}
-    for name, factory in _STRATEGY_DEFS:
-        with _timed(f"Strategy: {name.strip()}"):
+    for i, (name, factory) in enumerate(_STRATEGY_DEFS, 1):
+        label = f"{name.rstrip()} #{i}"
+        with _timed(f"Strategy: {label}"):
             try:
                 model = factory(df_pd, cfg)
-                predictions[name] = sorted(model.predict(pd.Timestamp(pred_date)))
+                predictions[label] = sorted(model.predict(pd.Timestamp(pred_date)))
             except Exception as e:
-                logger.error(f"{name.strip()} failed: {e}")
-                predictions[name] = []
+                logger.error(f"{label} failed: {e}")
+                predictions[label] = []
 
     # Step 4 — consensus
     with _timed("Compute consensus"):

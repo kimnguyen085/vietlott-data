@@ -46,7 +46,7 @@ power535_config = ProductConfig(
     raw_path=data_dir / "power535.jsonl",
     min_value=1,
     max_value=35,
-    size_output=5,
+    size_output=6,
     interval=timedelta(days=2),
     use_cookies=False,
 )
