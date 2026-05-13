@@ -20,11 +20,8 @@ dependencies = [
     "click",
     "pendulum",
     "requests",
-    "cloudscraper",
     "tabulate",
     "loguru",
-    "numpy",
-    "pandas",
 ]
 requires-python = ">=3.11,<3.14"
 readme = "README.md"
