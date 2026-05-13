@@ -30,4 +30,4 @@ COPY data/ data/
 ENV PYTHONPATH=/app/src
 ENV PYTHONUNBUFFERED=1
 
-CMD ["python", "src/machine_learning/make_prediction.py", "--product", "power_655", "--index-from", "0", "--index-to", "100"]
+CMD ["python", "src/machine_learning/make_prediction.py", "--product", "power_655", "--skip-fetch"]

@@ -6,14 +6,18 @@ import json
 import re
 from typing import Callable, Optional, Tuple
 
-import requests
+import cloudscraper
 from loguru import logger
 
 from vietlott.crawler.requests_helper.config import TIMEOUT
 
+_scraper = cloudscraper.create_scraper(
+    browser={"browser": "firefox", "platform": "windows", "mobile": False}
+)
+
 
 def get_vietlott_cookie() -> Tuple[str, dict]:
-    res = requests.get("https://vietlott.vn/ajaxpro/")
+    res = _scraper.get("https://vietlott.vn/ajaxpro/")
     match = re.search(r'document.cookie="(.*?)"', res.text)
     if match is None:
         raise ValueError(f"cookie is None, text={res.text}")
@@ -54,7 +58,7 @@ def fetch_wrapper(
             params.update(task_data["params"])
             body.update(task_data["body"])
 
-            res = requests.post(
+            res = _scraper.post(
                 url,
                 data=json.dumps(body),
                 params=params,
