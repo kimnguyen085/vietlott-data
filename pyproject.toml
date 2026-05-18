@@ -20,6 +20,8 @@ dependencies = [
     "click",
     "pendulum",
     "requests",
+    "cloudscraper",
+    "playwright",
     "tabulate",
     "loguru",
 ]
