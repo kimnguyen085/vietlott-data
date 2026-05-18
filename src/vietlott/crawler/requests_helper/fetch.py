@@ -13,16 +13,16 @@ from loguru import logger
 from vietlott.crawler.requests_helper.config import TIMEOUT
 
 
-def _zenrows_proxy() -> Optional[dict]:
-    api_key = os.environ.get("ZENROWS_API_KEY")
+def _scraper_proxy() -> Optional[dict]:
+    api_key = os.environ.get("SCRAPERAPI_KEY")
     if not api_key:
         return None
-    proxy_url = f"http://{api_key}:@proxy.zenrows.com:8001"
+    proxy_url = f"http://scraperapi:{api_key}@proxy-server.scraperapi.com:8001"
     return {"http": proxy_url, "https": proxy_url}
 
 
 def get_vietlott_cookie() -> Tuple[str, dict]:
-    proxies = _zenrows_proxy()
+    proxies = _scraper_proxy()
     res = requests.get("https://vietlott.vn/ajaxpro/", proxies=proxies, verify=proxies is None)
     match = re.search(r'document.cookie="(.*?)"', res.text)
     if match is None:
@@ -43,7 +43,7 @@ def fetch_wrapper(
     """
     return a fn to fetch data for a set of params and body
     """
-    proxies = _zenrows_proxy()
+    proxies = _scraper_proxy()
 
     def fetch(tasks):
         """

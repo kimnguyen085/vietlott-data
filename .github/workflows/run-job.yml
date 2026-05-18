@@ -25,5 +25,5 @@ jobs:
 
       - name: Run prediction
         env:
-          ZENROWS_API_KEY: ${{ secrets.ZENROWS_API_KEY }}
+          SCRAPERAPI_KEY: ${{ secrets.SCRAPERAPI_KEY }}
         run: uv run python src/machine_learning/make_prediction.py --product power_535 --index-from 0 --index-to 100
