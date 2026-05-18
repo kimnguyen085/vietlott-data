@@ -21,6 +21,11 @@ class ProductConfig:
     use_cookies: bool = True
     default_index_to: int = 1
     page_size: int = 6
+    # Optional special (bonus) number drawn from a different range.
+    # When set, predictions produce size_output main numbers + special_count bonus numbers.
+    special_min_value: int | None = None
+    special_max_value: int | None = None
+    special_count: int = 0
 
 
 power655_config = ProductConfig(
@@ -46,9 +51,12 @@ power535_config = ProductConfig(
     raw_path=data_dir / "power535.jsonl",
     min_value=1,
     max_value=35,
-    size_output=6,
+    size_output=5,
     interval=timedelta(days=2),
     use_cookies=False,
+    special_min_value=1,
+    special_max_value=12,
+    special_count=1,
 )
 keno_config = ProductConfig(
     name="keno",

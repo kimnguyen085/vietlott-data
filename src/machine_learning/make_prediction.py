@@ -206,7 +206,30 @@ def make_prediction(
             df_pd["result"] = df_pd["result"].apply(_normalize_result)
         logger.info(f"Loaded {len(df_pd):,} rows")
 
-    # Step 3 — predict
+    has_special = cfg.special_count > 0 and cfg.special_min_value is not None and cfg.special_max_value is not None
+
+    # Build a separate DataFrame for the special number (last element of each result).
+    df_special = None
+    if has_special and "result" in df_pd.columns:
+        df_special = df_pd.copy()
+        df_special["result"] = df_pd["result"].apply(
+            lambda r: [r[-cfg.special_count]] if isinstance(r, list) and len(r) >= cfg.special_count + 1 else []
+        )
+
+    def _make_special(cls, df, **kwargs):
+        model = cls(df, time_predict=1, min_val=cfg.special_min_value, max_val=cfg.special_max_value, **kwargs)
+        model.number_predict = cfg.special_count
+        return model
+
+    _SPECIAL_DEFS = [
+        ("Markov Chain      ", lambda df, _cfg: _make_special(MarkovChainStrategy, df, lookback_days=365, smoothing=0.5)),
+        ("Markov Chain      ", lambda df, _cfg: _make_special(MarkovChainStrategy, df, lookback_days=365, smoothing=0.5)),
+        ("Markov Chain      ", lambda df, _cfg: _make_special(MarkovChainStrategy, df, lookback_days=365, smoothing=0.5)),
+        ("Markov Chain      ", lambda df, _cfg: _make_special(MarkovChainStrategy, df, lookback_days=365, smoothing=0.1)),
+        ("Markov Chain      ", lambda df, _cfg: _make_special(MarkovChainStrategy, df, lookback_days=365, smoothing=1.0)),
+    ]
+
+    # Step 3 — predict main numbers
     predictions: dict[str, list[int]] = {}
     for i, (name, factory) in enumerate(_STRATEGY_DEFS, 1):
         label = f"{name.rstrip()} #{i}"
@@ -218,6 +241,19 @@ def make_prediction(
                 logger.error(f"{label} failed: {e}")
                 predictions[label] = []
 
+    # Step 3b — predict special number (if applicable)
+    special_predictions: dict[str, list[int]] = {}
+    if has_special and df_special is not None:
+        with _timed("Predict special number"):
+            for i, (name, factory) in enumerate(_SPECIAL_DEFS, 1):
+                label = f"{name.rstrip()} #{i}"
+                try:
+                    model = factory(df_special, cfg)
+                    special_predictions[label] = sorted(model.predict(pd.Timestamp(pred_date)))
+                except Exception as e:
+                    logger.error(f"Special {label} failed: {e}")
+                    special_predictions[label] = []
+
     # Step 4 — consensus
     with _timed("Compute consensus"):
         votes: Counter = Counter()
@@ -226,6 +262,15 @@ def make_prediction(
         consensus = sorted(
             [num for num, _ in sorted(votes.most_common(), key=lambda x: (-x[1], x[0]))[:cfg.size_output]]
         )
+
+        special_votes: Counter = Counter()
+        special_consensus: list[int] = []
+        if has_special and special_predictions:
+            for nums in special_predictions.values():
+                special_votes.update(nums)
+            special_consensus = sorted(
+                [num for num, _ in sorted(special_votes.most_common(), key=lambda x: (-x[1], x[0]))[:cfg.special_count]]
+            )
 
     # Step 5 — write output
     with _timed(f"Write result to {output}"):
@@ -244,16 +289,25 @@ def make_prediction(
         ]
 
         for name, nums in predictions.items():
-            lines.append(f"{name}: {_format_numbers(nums)}")
+            special_part = f"  |  Special: {_format_numbers(special_predictions.get(name, []))}" if has_special else ""
+            lines.append(f"{name}: {_format_numbers(nums)}{special_part}")
 
         lines += [
             "",
             sep,
             "Consensus  (top-voted numbers across all strategies)",
             thin,
-            f"  {_format_numbers(consensus)}",
+        ]
+
+        if has_special:
+            lines.append(f"  Main   : {_format_numbers(consensus)}")
+            lines.append(f"  Special: {_format_numbers(special_consensus)}  (range {cfg.special_min_value}–{cfg.special_max_value})")
+        else:
+            lines.append(f"  {_format_numbers(consensus)}")
+
+        lines += [
             "",
-            "Number vote breakdown",
+            "Number vote breakdown (main)",
             thin,
         ]
 
@@ -262,6 +316,18 @@ def make_prediction(
             v = votes[num]
             bar = "#" * v + "." * (max_votes - v)
             lines.append(f"  {num:2d}  [{bar}]  {v}/{len(_STRATEGY_DEFS)}")
+
+        if has_special and special_votes:
+            lines += [
+                "",
+                "Number vote breakdown (special)",
+                thin,
+            ]
+            max_sv = max(special_votes.values(), default=1)
+            for num in sorted(special_votes.keys()):
+                v = special_votes[num]
+                bar = "#" * v + "." * (max_sv - v)
+                lines.append(f"  {num:2d}  [{bar}]  {v}/{len(_SPECIAL_DEFS)}")
 
         lines += [
             "",
