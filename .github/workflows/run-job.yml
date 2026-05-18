@@ -21,7 +21,7 @@ jobs:
         uses: astral-sh/setup-uv@v4
 
       - name: Install dependencies
-        run: uv sync
+        run: uv sync --extra ml
 
       - name: Run prediction
         run: uv run python src/machine_learning/make_prediction.py --product power_535 --index-from 0 --index-to 100
