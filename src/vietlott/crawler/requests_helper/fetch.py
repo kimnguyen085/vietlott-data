@@ -6,24 +6,55 @@ import json
 import os
 import re
 from typing import Callable, Optional, Tuple
+from urllib.parse import urlencode
 
 import requests
 from loguru import logger
 
 from vietlott.crawler.requests_helper.config import TIMEOUT
 
+_SCRAPERAPI_ENDPOINT = "https://api.scraperapi.com/"
 
-def _scraper_proxy() -> Optional[dict]:
-    api_key = os.environ.get("SCRAPERAPI_KEY")
-    if not api_key:
-        return None
-    proxy_url = f"http://scraperapi:{api_key}@proxy-server.scraperapi.com:8001"
-    return {"http": proxy_url, "https": proxy_url}
+
+def _scraperapi_key() -> Optional[str]:
+    return os.environ.get("SCRAPERAPI_KEY")
+
+
+def _get(url: str, **kwargs) -> requests.Response:
+    api_key = _scraperapi_key()
+    if api_key:
+        return requests.get(
+            _SCRAPERAPI_ENDPOINT,
+            params={"api_key": api_key, "url": url},
+            timeout=TIMEOUT,
+        )
+    return requests.get(url, timeout=TIMEOUT, **kwargs)
+
+
+def _post(url: str, params: dict, headers: dict, data: str, cookies: Optional[dict]) -> requests.Response:
+    api_key = _scraperapi_key()
+    if api_key:
+        # ScraperAPI forwards the body and headers to the target URL.
+        target = url + ("?" + urlencode(params) if params else "")
+        return requests.post(
+            _SCRAPERAPI_ENDPOINT,
+            params={"api_key": api_key, "url": target},
+            data=data,
+            headers=headers,
+            timeout=TIMEOUT,
+        )
+    return requests.post(
+        url,
+        data=data,
+        params=params,
+        headers=headers,
+        cookies=cookies,
+        timeout=TIMEOUT,
+    )
 
 
 def get_vietlott_cookie() -> Tuple[str, dict]:
-    proxies = _scraper_proxy()
-    res = requests.get("https://vietlott.vn/ajaxpro/", proxies=proxies, verify=proxies is None)
+    res = _get("https://vietlott.vn/ajaxpro/")
     match = re.search(r'document.cookie="(.*?)"', res.text)
     if match is None:
         raise ValueError(f"cookie is None, text={res.text}")
@@ -43,7 +74,6 @@ def fetch_wrapper(
     """
     return a fn to fetch data for a set of params and body
     """
-    proxies = _scraper_proxy()
 
     def fetch(tasks):
         """
@@ -65,16 +95,7 @@ def fetch_wrapper(
             params.update(task_data["params"])
             body.update(task_data["body"])
 
-            res = requests.post(
-                url,
-                data=json.dumps(body),
-                params=params,
-                headers=_headers,
-                cookies=cookies,
-                timeout=TIMEOUT,
-                proxies=proxies,
-                verify=proxies is None,
-            )
+            res = _post(url, params, _headers, json.dumps(body), cookies)
 
             if not res.ok:
                 logger.error(
